@@ -4,43 +4,34 @@ import requests
 import os
 from datetime import datetime
 
-# 使用API代理服务提高访问稳定性
+# API和风天气, 这里调试过了，api每日有使用限制，不需要重复调试
 API_KEY = "b6e0be06cab03e87ce3cb6324f90027c"
 
-def get_60mins_forecast(city):
-    params = {
-        "q": city,
-        "appid": API_KEY,
-        "units": "metric"
-    }
-    response = requests.get(f"https://api.openweathermap.org/data/3.0/onecall?lat=33.44&lon=-94.04&exclude=minutely&appid={API_KEY}", )
+DATA = dict()
+def get_forecast():
+    response = requests.get('https://devapi.qweather.com/v7/minutely/5m?location=102.42,25.02&key=3a4aa2839f7746c2a502d5e603202d2a' )
     if response.status_code == 200:
         data = response.json()
-        # forecast = []
-        # for item in data['list']:
-        #     date = datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d %H:%M:%S')
-        #     forecast.append({
-        #         "date": date,
-        #         "temperature": item['main']['temp'],
-        #         "description": item['weather'][0]['description']
-        #     })
-        return forecast
+        forecast = []
+        for item in data['minutely']:
+            if float(item['precip']) >= 0.3:
+                forecast.append({
+                    "precip": item['precip'],
+                    "time": item['fxTime']
+                })
+        summary = data['summary']
+        return forecast,summary
     else:
         return None
 
-# 使用示例
-city = "London"
-forecast = get_60mins_forecast(city)
-if forecast:
-    print(f"5-day forecast for {city}:")
-    for day in forecast[:5]:  # 只打印前5条数据作为示例
-        print(f"Date: {day['date']}, Temp: {day['temperature']}°C, Description: {day['description']}")
-else:
-    print("Failed to retrieve forecast data.")
+def get_preci():
+    fore, suma = get_forecast()
+    print(fore)
+    print(suma)
 
 
 
-
+#mqtt部分
 def on_connect(client, userdata, flags, rc):
     """
     一旦连接成功, 回调此方法
@@ -83,6 +74,7 @@ def mqtt_publish():
 def on_message(client, userdata, msg):
     """一旦订阅到消息, 回调此方法"""
     print("主题:"+msg.topic+" 消息:"+str(msg.payload.decode('gb2312')))
+    DATA[msg.topic] = str(msg.payload.decode('gb2312'))
 
 
 def on_subscribe():
@@ -90,9 +82,11 @@ def on_subscribe():
     mqttClient = mqtt_connect()
     mqttClient.subscribe("window/tem", 2)
 
+#web部分
+
 
 if __name__ == '__main__':
-    mqttClient = mqtt_connect()
-    mqtt_publish()
-    on_subscribe()
-    mqttClient.loop_forever()
+    # mqttClient = mqtt_connect()
+    # mqtt_publish()
+    # on_subscribe()
+    # mqttClient.loop_forever()
