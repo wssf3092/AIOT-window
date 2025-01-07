@@ -1,15 +1,16 @@
 from paho.mqtt import client as mqtt
 import uuid
 import requests
-import os
-from datetime import datetime
+from flask import Flask, request
+import json
 
 # API和风天气, 这里调试过了，api每日有使用限制，不需要重复调试
 API_KEY = "b6e0be06cab03e87ce3cb6324f90027c"
 
 DATA = dict()
-def get_forecast():
-    response = requests.get('https://devapi.qweather.com/v7/minutely/5m?location=102.42,25.02&key=3a4aa2839f7746c2a502d5e603202d2a' )
+def get_forecast(loc1,loc2):
+    #location = 102.42, 25.02
+    response = requests.get(f'https://devapi.qweather.com/v7/minutely/5m?location={loc1},{loc2}&key=3a4aa2839f7746c2a502d5e603202d2a' )
     if response.status_code == 200:
         data = response.json()
         forecast = []
@@ -24,10 +25,7 @@ def get_forecast():
     else:
         return None
 
-def get_preci():
-    fore, suma = get_forecast()
-    print(fore)
-    print(suma)
+
 
 
 
@@ -63,11 +61,10 @@ def mqtt_connect():
     return mqttClient
 
 
-def mqtt_publish():
+def mqtt_publish(Range):
     """发布主题为'mqtt/demo',内容为'Demo text',服务质量为2"""
     mqttClient = mqtt_connect()
-
-    text = "Demo text"
+    text = str(Range)
     mqttClient.publish('window/control', text, 2)
     mqttClient.loop_stop()
 
@@ -83,9 +80,29 @@ def on_subscribe():
     mqttClient.subscribe("window/tem", 2)
 
 #web部分
+app = Flask(__name__)
 
+@app.route('/get_sensor')
+def sensorGet():
+    kind = request.args.get('kind')
+    data = json.dumps({kind: DATA[kind]})
+    return data
+@app.route('/get_pre')
+def preGet():
+    loc1 = request.args.get('loc1')
+    loc2 = request.args.get('loc2')
+    fore,suma = get_forecast(loc1,loc2)
+    data = json.dumps({'fore': fore, 'suma': suma})
+    return data
+@app.route('/change', methods=["POST"])
+def changePost():
+    Range = request.args.get('Range')
+    mqtt_publish(Range)
+    return True
 
 if __name__ == '__main__':
+    app.run(port=5000)
+    # 需要多进程管理
     # mqttClient = mqtt_connect()
     # mqtt_publish()
     # on_subscribe()
